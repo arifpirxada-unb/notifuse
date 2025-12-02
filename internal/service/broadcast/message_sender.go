@@ -14,6 +14,8 @@ import (
 	"github.com/Notifuse/notifuse/pkg/notifuse_mjml"
 	"github.com/google/uuid"
 	"golang.org/x/sync/semaphore"
+	"golang.org/x/net/html"
+	"os"
 )
 
 //go:generate mockgen -destination=./mocks/mock_message_sender.go -package=mocks github.com/Notifuse/notifuse/internal/service/broadcast MessageSender
@@ -196,6 +198,27 @@ func (s *messageSender) enforceRateLimit(ctx context.Context, integrationRateLim
 	return nil
 }
 
+func extractText(n *html.Node, b *strings.Builder) {
+	// Skip script and style tags
+	if n.Type == html.ElementNode && (n.Data == "script" || n.Data == "style") {
+		return
+	}
+
+	// If it's a text node, append it
+	if n.Type == html.TextNode {
+		text := strings.TrimSpace(n.Data)
+		if text != "" {
+			b.WriteString(text)
+			b.WriteString("\n")
+		}
+	}
+
+	// Traverse children
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		extractText(c, b)
+	}
+}
+
 // SendToRecipient sends a message to a single recipient
 func (s *messageSender) SendToRecipient(ctx context.Context, workspaceID string, integrationID string, trackingEnabled bool, broadcast *domain.Broadcast, messageID string, email string,
 	template *domain.Template, data map[string]interface{}, emailProvider *domain.EmailProvider, timeoutAt time.Time) error {
@@ -315,6 +338,9 @@ func (s *messageSender) SendToRecipient(ctx context.Context, workspaceID string,
 		return NewBroadcastError(ErrCodeTemplateCompile, "failed to process subject with Liquid", true, err)
 	}
 
+
+	// fmt.Println("Content HTML:", *compiledTemplate.HTML)
+
 	// Create SendEmailProviderRequest
 	emailRequest := domain.SendEmailProviderRequest{
 		WorkspaceID:   workspaceID,
@@ -330,6 +356,38 @@ func (s *messageSender) SendToRecipient(ctx context.Context, workspaceID string,
 			ReplyTo: template.Email.ReplyTo,
 		},
 	}
+
+	emailMode := os.Getenv("EMAIL_GENERATION_MODE")
+
+	if emailMode == "text" {
+
+		var textEmail strings.Builder
+
+		htmlString := *compiledTemplate.HTML
+		r := strings.NewReader(htmlString)
+		rootNode, err := html.Parse(r)
+
+		if err != nil {
+			s.logger.WithFields(map[string]interface{}{
+				"broadcast_id": broadcast.ID,
+				"workspace_id": workspaceID,
+				"recipient":    email,
+				"error":        err.Error(),
+			}).Error("Failed to send message")
+			return NewBroadcastError(ErrCodeSendFailed, "Failed to parse text from html", true, err)
+		}
+
+		extractText(rootNode, &textEmail)
+
+		emailRequest.Content = textEmail.String()
+		fmt.Println("EMAIL_GENERATION_MODE ENV SET - TEXT EXTRACTED:", textEmail.String())
+	} else {
+		fmt.Println("EMAIL_GENERATION_MODE ENV NOT SET")
+	}
+
+	// fmt.Println("Content TEXT:", textEmail.String())
+
+
 
 	// Now send email directly using compiled HTML rather than passing template to broadcastRepo
 	// Note: Context is checked by SendEmail; in rare cancellation cases we may complete
@@ -635,6 +693,10 @@ func (s *messageSender) SendBatch(ctx context.Context, workspaceID string, integ
 }
 
 // generateMessageID creates a unique message ID for tracking
+
+// ensure html.Parse is linked (no runtime cost)
+var _htmlParse = html.Parse
+
 func generateMessageID(workspaceID string) string {
 	return fmt.Sprintf("%s_%s", workspaceID, uuid.New().String())
 }

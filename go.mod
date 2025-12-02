@@ -32,7 +32,8 @@ require (
 	go.opencensus.io v0.24.0
 	golang.org/x/crypto v0.42.0
 	golang.org/x/sync v0.17.0
-)
+	golang.org/x/net v0.44.0
+	)
 
 require (
 	cloud.google.com/go/compute/metadata v0.3.0 // indirect
@@ -97,7 +98,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.24.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/exp v0.0.0-20230905200255-921286631fa9 // indirect
-	golang.org/x/net v0.44.0 // indirect
+
 	golang.org/x/oauth2 v0.27.0 // indirect
 	golang.org/x/sys v0.36.0 // indirect
 	golang.org/x/text v0.30.0 // indirect
