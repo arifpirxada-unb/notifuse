@@ -198,25 +198,67 @@ func (s *messageSender) enforceRateLimit(ctx context.Context, integrationRateLim
 	return nil
 }
 
+
+// This function extracts text from html, except <br>, <ul> and <a> tags
+
 func extractText(n *html.Node, b *strings.Builder) {
-	// Skip script and style tags
-	if n.Type == html.ElementNode && (n.Data == "script" || n.Data == "style") {
-		return
-	}
+    // 1. Skip script and style tags
+    if n.Type == html.ElementNode && (n.Data == "script" || n.Data == "style") {
+        return
+    }
 
-	// If it's a text node, append it
-	if n.Type == html.TextNode {
-		text := strings.TrimSpace(n.Data)
-		if text != "" {
-			b.WriteString(text)
-			b.WriteString("\n")
-		}
-	}
+    // 2. Handle specific element nodes to preserve the HTML tag
+    if n.Type == html.ElementNode {
+        switch n.Data {
+        case "br":
+            // Preserve the <br> tag
+            b.WriteString("<br>")
+            return // <br> has no children
 
-	// Traverse children
-	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		extractText(c, b)
-	}
+        case "a", "ul", "li":
+            // Preserve the opening tag with attributes
+            b.WriteString("<")
+            b.WriteString(n.Data)
+            
+            // Write attributes (crucial for <a> href)
+            for _, attr := range n.Attr {
+                b.WriteString(" ")
+                b.WriteString(attr.Key)
+                b.WriteString("=\"")
+                b.WriteString(attr.Val)
+                b.WriteString("\"")
+            }
+            b.WriteString(">")
+        }
+    }
+
+    // 3. If it's a text node, append it
+    if n.Type == html.TextNode {
+        text := strings.TrimSpace(n.Data)
+        if text != "" {
+            b.WriteString(text)
+        }
+    }
+
+    // 4. Traverse children
+    for c := n.FirstChild; c != nil; c = c.NextSibling {
+        extractText(c, b)
+    }
+
+    // 5. Handle closing tags
+    if n.Type == html.ElementNode {
+        switch n.Data {
+        case "a", "ul", "li":
+            // Preserve the closing tag
+            b.WriteString("</")
+            b.WriteString(n.Data)
+            b.WriteString(">")
+        
+        case "p", "div":
+            // Add a proper HTML line break or spacing after block elements
+            b.WriteString("<br><br>")
+        }
+    }
 }
 
 // SendToRecipient sends a message to a single recipient
