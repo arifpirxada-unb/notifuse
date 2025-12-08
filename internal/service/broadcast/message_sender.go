@@ -215,7 +215,7 @@ func extractText(n *html.Node, b *strings.Builder) {
             b.WriteString("<br>")
             return // <br> has no children
 
-        case "a", "ul", "li":
+        case "a", "ul", "li", "b":
             // Preserve the opening tag with attributes
             b.WriteString("<")
             b.WriteString(n.Data)
@@ -248,7 +248,7 @@ func extractText(n *html.Node, b *strings.Builder) {
     // 5. Handle closing tags
     if n.Type == html.ElementNode {
         switch n.Data {
-        case "a", "ul", "li":
+        case "a", "ul", "li", "b":
             // Preserve the closing tag
             b.WriteString("</")
             b.WriteString(n.Data)

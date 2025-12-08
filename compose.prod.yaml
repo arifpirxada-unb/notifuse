@@ -4,12 +4,7 @@
 
 services:
   api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    ports:
-      - '8080:8080'
-      - '587:587'
+    image: arifpirxada/notifuse_unbundl:stable
     environment:
       # Server Configuration
       - SERVER_PORT=${SERVER_PORT:-8080}
@@ -42,13 +37,6 @@ services:
       # - SMTP_PASSWORD=${SMTP_PASSWORD}
       # - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL}
       # - SMTP_FROM_NAME=${SMTP_FROM_NAME}
-
-      # SMTP Relay Configuration (Optional - for receiving inbound emails)
-      # - SMTP_RELAY_ENABLED=${SMTP_RELAY_ENABLED}
-      # - SMTP_RELAY_PORT=${SMTP_RELAY_PORT}
-      # - SMTP_RELAY_DOMAIN=${SMTP_RELAY_DOMAIN}
-      # - SMTP_RELAY_TLS_CERT_BASE64=${SMTP_RELAY_TLS_CERT_BASE64}
-      # - SMTP_RELAY_TLS_KEY_BASE64=${SMTP_RELAY_TLS_KEY_BASE64}
     depends_on:
       - postgres
     volumes:
@@ -79,6 +67,20 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - /root/certbot/conf:/etc/letsencrypt
+      - /root/certbot/www:/var/www/certbot
+    depends_on:
+      - api
+    networks:
+      - notifuse-network 
 
 volumes:
   postgres-data:
